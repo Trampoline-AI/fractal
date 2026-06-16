@@ -45,6 +45,10 @@ predict-rlm = { git = "https://github.com/Trampoline-AI/predict-rlm.git", branch
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = ["-m", "not integration"]
+markers = [
+    "integration: tests that call real PredictRLM/model/sbx services",
+]
 
 [tool.ruff]
 lint.select = ["E", "F", "W", "I", "N"]
