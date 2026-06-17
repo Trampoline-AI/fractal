@@ -252,6 +252,13 @@ class FractalRuntime:
             # Ctrl-C cancels the active turn. Persist it distinctly so the next
             # prompt and future resumes know this was user-initiated, not a
             # model/tool failure.
+            #
+            # No sandbox recovery is needed here: the cancellation propagates
+            # into the in-flight `aexecute`, whose cancellation-safe handler
+            # (predict-rlm#42) interrupts the running cell and leaves the
+            # interpreter quiescent, so the next turn reuses it as-is. Do not
+            # rebuild/replace the interpreter on interrupt — see
+            # tests/test_runtime_interrupt_recovery.py.
             self.session.add_agent_turn(
                 status="interrupted",
                 error=INTERRUPTED_ERROR,
