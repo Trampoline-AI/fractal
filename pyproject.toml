@@ -20,7 +20,7 @@ classifiers = [
 dependencies = [
     "pydantic>=2",
     "prompt-toolkit>=3.0",
-    "predict-rlm[sbx]==0.7.0a3",
+    "predict-rlm[sbx]",
     "rich>=13",
     "tomli-w>=1.2",
 ]
@@ -39,6 +39,9 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.11.5",
 ]
+
+[tool.uv.sources]
+predict-rlm = { git = "https://github.com/Trampoline-AI/predict-rlm.git", branch = "feat/sbx-reattach-and-interrupt-41-42" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

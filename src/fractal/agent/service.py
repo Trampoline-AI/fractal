@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol, cast
@@ -7,7 +9,7 @@ from typing import Protocol, cast
 import dspy
 from dspy.utils.callback import BaseCallback
 from predict_rlm import PredictRLM, RunTrace, Workspace, WorkspaceMode
-from predict_rlm.backends import ExecutionBackend, SbxBackend
+from predict_rlm.backends import ExecutionBackend, SbxBackend, SbxConfig
 from predict_rlm.skills import docx, pdf, spreadsheet
 from predict_rlm.workspace import DirectWorkspaceMount
 
@@ -135,16 +137,50 @@ class FractalAgent(dspy.Module):
             self.interpreter.prewarm()
 
 
+def sandbox_name_for(
+    workspace_path: str | Path,
+    included_paths: list[str | Path] | None = None,
+) -> str:
+    """Deterministic, per-directory sandbox name used for hot reuse.
+
+    The identity is the resolved workspace path plus the (sorted) set of extra
+    mounts: a different mount set needs a different sandbox, because the bind
+    mounts are fixed at ``sbx create`` time and a reattach cannot add them.
+    """
+    workspace = Path(workspace_path).resolve()
+    includes = sorted(str(Path(path).resolve()) for path in included_paths or [])
+    identity = "\n".join([str(workspace), *includes])
+    digest = hashlib.sha256(identity.encode()).hexdigest()[:12]
+    base = re.sub(r"[^a-z0-9-]+", "-", workspace.name.lower()).strip("-") or "ws"
+    return f"fractal-{base[:24]}-{digest}"
+
+
 def create_sbx_interpreter(
     workspace_path: str | Path,
     included_paths: list[str | Path] | None = None,
+    *,
+    reuse: bool = True,
 ) -> SbxBackend:
+    config = (
+        SbxConfig(name=sandbox_name_for(workspace_path, included_paths), reuse=True)
+        if reuse
+        else None
+    )
     return SbxBackend(
+        config=config,
         direct_workspace_mounts=build_direct_workspace_mounts(
             workspace_path,
             included_paths,
-        )
+        ),
     )
+
+
+def remove_sandbox_for(
+    workspace_path: str | Path,
+    included_paths: list[str | Path] | None = None,
+) -> None:
+    """Force-remove the hot sandbox for a directory so the next start is clean."""
+    SbxBackend.remove(sandbox_name_for(workspace_path, included_paths))
 
 
 def build_direct_workspace_mounts(

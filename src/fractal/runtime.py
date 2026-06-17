@@ -82,6 +82,7 @@ class FractalRuntime:
         provider_selection: ProviderSelection | None = None,
         sub_lm_follows_main: bool = True,
         sub_model: str | None = None,
+        reuse_sandbox: bool = True,
     ) -> "FractalRuntime":
         workspace = Path(workspace_path).resolve()
         runtime = cls(
@@ -97,7 +98,9 @@ class FractalRuntime:
                 max_iterations=max_iterations,
                 verbose=verbose,
                 debug=debug,
-                interpreter=create_sbx_interpreter(workspace, included_paths),
+                interpreter=create_sbx_interpreter(
+                    workspace, included_paths, reuse=reuse_sandbox
+                ),
             ),
             lm=lm,
             sub_lm=sub_lm,

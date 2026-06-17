@@ -561,7 +561,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "predict-rlm", extras = ["sbx"], specifier = "==0.7.0a3" },
+    { name = "predict-rlm", extras = ["sbx"], git = "https://github.com/Trampoline-AI/predict-rlm.git?branch=feat%2Fsbx-reattach-and-interrupt-41-42" },
     { name = "prompt-toolkit", specifier = ">=3.0" },
     { name = "pydantic", specifier = ">=2" },
     { name = "rich", specifier = ">=13" },
@@ -1385,8 +1385,8 @@ wheels = [
 
 [[package]]
 name = "predict-rlm"
-version = "0.7.0a3"
-source = { registry = "https://pypi.org/simple" }
+version = "0.7.0a4"
+source = { git = "https://github.com/Trampoline-AI/predict-rlm.git?branch=feat%2Fsbx-reattach-and-interrupt-41-42#df84ad0122d36c01fb0b72d85d09c9cb0575e47a" }
 dependencies = [
     { name = "deno" },
     { name = "dspy" },
@@ -1394,10 +1394,6 @@ dependencies = [
     { name = "pydantic" },
     { name = "pygments" },
     { name = "tenacity" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/da/7c/b7eeef2ff8dc6b58997b4b6b6c2e2f890c1eb5ada5082d629bc58a8025d8/predict_rlm-0.7.0a3.tar.gz", hash = "sha256:080189711bd6703b3615c90ea0d8f176fd63e7dfbe40ebea57681bddb3da7793", size = 249252, upload-time = "2026-06-16T01:33:13.301Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f1/bc/09f5f887024599b64917e5c03a01b872d4d758d661098d171a9ed0190907/predict_rlm-0.7.0a3-py3-none-any.whl", hash = "sha256:e4de0a97c596b89ed2d58177b5840d32e19f710978d6014ecb37d47de5031a79", size = 278833, upload-time = "2026-06-16T01:33:11.467Z" },
 ]
 
 [package.optional-dependencies]

@@ -119,6 +119,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--debug", action="store_true", help="enable PredictRLM debug mode"
     )
     parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help=(
+            "tear down the directory's hot sandbox before starting so a clean "
+            "one is created"
+        ),
+    )
+    parser.add_argument(
+        "--ephemeral",
+        action="store_true",
+        help=(
+            "do not reuse or keep a hot sandbox; create a throwaway one and "
+            "remove it on exit"
+        ),
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help=(
@@ -235,6 +251,11 @@ def run_tui(args: argparse.Namespace, notifier: Any | None = None) -> int:
 
     workspace = args.workspace.resolve()
     display_verbose = _effective_verbose(args, lm_config)
+    reuse_sandbox = not args.ephemeral
+    if args.fresh and reuse_sandbox:
+        from .agent.service import remove_sandbox_for
+
+        remove_sandbox_for(workspace, args.include)
     runtime = FractalRuntime.create(
         workspace_path=workspace,
         included_paths=args.include,
@@ -247,9 +268,15 @@ def run_tui(args: argparse.Namespace, notifier: Any | None = None) -> int:
         provider_selection=lm_config.provider_selection,
         sub_lm_follows_main=lm_config.sub_lm_follows_main,
         sub_model=lm_config.sub_model,
+        reuse_sandbox=reuse_sandbox,
+    )
+    status_text = (
+        "[dim]starting sandbox...[/dim]"
+        if args.ephemeral
+        else "[dim]starting sandbox (reusing hot sandbox if available)...[/dim]"
     )
     try:
-        with console.status("[dim]starting sandbox...[/dim]", spinner="dots"):
+        with console.status(status_text, spinner="dots"):
             runtime.prewarm()
         asyncio.run(
             TerminalFractalApp(
@@ -329,6 +356,11 @@ def run_non_interactive(
     display_verbose = _effective_verbose(args, lm_config)
     from .runtime import FractalRuntime
 
+    reuse_sandbox = not args.ephemeral
+    if args.fresh and reuse_sandbox:
+        from .agent.service import remove_sandbox_for
+
+        remove_sandbox_for(workspace, args.include)
     try:
         runtime = FractalRuntime.create(
             workspace_path=workspace,
@@ -342,6 +374,7 @@ def run_non_interactive(
             provider_selection=lm_config.provider_selection,
             sub_lm_follows_main=lm_config.sub_lm_follows_main,
             sub_model=lm_config.sub_model,
+            reuse_sandbox=reuse_sandbox,
         )
     except Exception as exc:
         if args.json:

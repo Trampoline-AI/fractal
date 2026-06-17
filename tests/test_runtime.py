@@ -457,6 +457,8 @@ def test_runtime_create_reuses_one_interpreter_until_close(
     def fake_create_sbx_interpreter(
         workspace_path: str | Path,
         included_paths: list[str | Path] | None = None,
+        *,
+        reuse: bool = True,
     ) -> object:
         created_with.append((
             Path(workspace_path),

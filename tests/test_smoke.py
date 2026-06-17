@@ -557,13 +557,15 @@ def test_run_tui_shows_shutdown_status_and_closes_runtime(
             debug=False,
             resume=None,
             verbose=True,
+            fresh=False,
+            ephemeral=False,
         )
     )
 
     assert result == 0
     assert events == [
         "create",
-        "status:[dim]starting sandbox...[/dim]:dots",
+        "status:[dim]starting sandbox (reusing hot sandbox if available)...[/dim]:dots",
         "status_enter",
         "prewarm",
         "status_exit",
@@ -646,6 +648,8 @@ def test_run_tui_allows_force_exit_during_shutdown(
             debug=False,
             resume=None,
             verbose=False,
+            fresh=False,
+            ephemeral=False,
         )
     )
 
