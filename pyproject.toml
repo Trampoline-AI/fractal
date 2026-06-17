@@ -40,9 +40,6 @@ dev = [
     "ruff>=0.11.5",
 ]
 
-[tool.uv.sources]
-predict-rlm = { git = "https://github.com/Trampoline-AI/predict-rlm.git", branch = "feat/sbx-reattach-and-interrupt-41-42" }
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["-m", "not integration"]

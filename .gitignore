@@ -223,3 +223,5 @@ __marimo__/
 # Local credentials and sandbox state
 .env.*
 .predict_rlm_sbx
+
+.vscode
