@@ -261,7 +261,7 @@ def test_run_non_interactive_closes_runtime_on_success_and_failure(
     assert "fractal: failed: boom" in stderr.getvalue()
 
 
-def test_run_non_interactive_verbose_prints_iteration_trace_to_stderr(
+def test_run_non_interactive_prints_iteration_trace_to_stderr_by_default(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     from predict_rlm.trace import IterationStep
@@ -310,7 +310,6 @@ def test_run_non_interactive_verbose_prints_iteration_trace_to_stderr(
             str(tmp_path),
             "--lm",
             "test-lm",
-            "--verbose",
             "-p",
             "update docs",
         ]
@@ -327,6 +326,7 @@ def test_run_non_interactive_verbose_prints_iteration_trace_to_stderr(
 
     assert exit_code == 0
     assert stdout.getvalue() == "done\n"
+    assert args.verbose is False
     assert callable(calls["on_iteration_event"])
     create_kwargs = calls["create_kwargs"]
     assert isinstance(create_kwargs, dict)

@@ -15,8 +15,10 @@ echo "summarize recent changes" | fractal -p "review this diff"  # prompt + stdi
 | Channel | Content |
 | --- | --- |
 | stdout | Final response text only |
-| stderr | Banner, progress, changed files, usage/cost, completion status |
+| stderr | Banner, progress, verbose iteration detail, changed files, usage/cost, completion status |
 
+- Headless runs show generated code and model-visible output for each RLM
+  iteration on stderr by default.
 - Add `--quiet` to silence everything but the final stdout response.
 - Add `--json` for a machine-readable result object on stdout (`session_id`,
   `status`, `response`, `changed_files`, `usage`, `error`); pair with

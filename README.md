@@ -264,7 +264,7 @@ that's what the sandbox sees and what the agent reads and edits.
 | `--max-iterations N` | Max RLM iterations per turn; defaults to the configured value or 30. |
 | `--lm MODEL` | Override the configured main model for this run (bypasses config resolution). |
 | `--sub-lm MODEL` | Override the configured sub-model for this run. |
-| `--verbose` | Show generated code and model-visible output for each RLM iteration. |
+| `--verbose` | Show generated code and model-visible output for each RLM iteration; enabled by default with `-p`. |
 | `--quiet` | Suppress progress chatter (non-interactive runs). |
 | `--debug` | Enable PredictRLM debug mode. |
 
@@ -281,6 +281,9 @@ fractal -p "fix the failing tests"          # one turn, prompt as an argument
 git diff | fractal -p -                      # read the entire prompt from stdin
 echo "summarize recent changes" | fractal -p "review this diff"  # prompt + stdin context
 ```
+
+Headless runs show generated code and model-visible output for each RLM
+iteration on stderr by default. Use `--quiet` for stdout-only scripts.
 
 See [docs/headless.md](docs/headless.md) for the full output contract, exit codes, and CI patterns.
 

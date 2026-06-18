@@ -518,6 +518,9 @@ verbose = true
     assert cli._effective_max_iterations(args, plain) == 30
     assert cli._effective_verbose(args, plain) is False
 
+    args = cli.build_parser().parse_args(["-p", "summarize"])
+    assert cli._effective_verbose(args, plain) is True
+
 
 def test_config_setup_writes_config_and_warns_when_key_env_missing(
     monkeypatch: pytest.MonkeyPatch,

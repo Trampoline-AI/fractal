@@ -60,6 +60,8 @@ def _effective_max_iterations(args: argparse.Namespace, lm_config: Any) -> int:
 def _effective_verbose(args: argparse.Namespace, lm_config: Any) -> bool:
     if getattr(args, "verbose", False):
         return True
+    if getattr(args, "prompt", None) is not None:
+        return True
     defaults = getattr(lm_config, "defaults", None)
     return bool(defaults is not None and defaults.verbose)
 
