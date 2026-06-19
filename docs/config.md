@@ -36,6 +36,7 @@ default name:
 | `anthropic` | Paste (stored) or env var | `ANTHROPIC_API_KEY` |
 | `gemini` | Paste (stored) or env var | `GEMINI_API_KEY` |
 | `xai` | Paste (stored) or env var | `XAI_API_KEY` |
+| `zai` | Paste (stored) or env var | `ZAI_API_KEY` |
 | `deepseek` | Paste (stored) or env var | `DEEPSEEK_API_KEY` |
 | `mistral` | Paste (stored) or env var | `MISTRAL_API_KEY` |
 | `groq` | Paste (stored) or env var | `GROQ_API_KEY` |
@@ -68,11 +69,13 @@ If setup uses an environment variable that is currently unset, it still writes
 the config (which never contains secrets) and prints the exact variable to
 export; `fractal config status` verifies readiness afterwards.
 
-Setup and `config status` also make one cheap authenticated request against
-the provider (a models-list endpoint, or `/api/tags` for Ollama) so a typo'd
-or revoked key is caught immediately instead of on the first agent turn. Pass
-`--offline` to skip the live check; network failures during setup only warn
-and never discard a finished setup.
+Setup and `config status` also make one cheap authenticated request when
+Fractal knows a suitable provider endpoint (a models-list endpoint, or
+`/api/tags` for Ollama) so a typo'd or revoked key is caught immediately
+instead of on the first agent turn. Providers without a known cheap check are
+reported as "not checked for this provider". Pass `--offline` to skip the live
+check; network failures during setup only warn and never discard a finished
+setup.
 
 ## Non-interactive access
 

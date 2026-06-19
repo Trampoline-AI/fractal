@@ -198,8 +198,8 @@ exist for that. It's a window onto what a self-harnessed RLM can do.
 
 - **Powered by predict-rlm** — recursive and self-harnessed. The runtime is
   the agent; there's no orchestration to assemble.
-- **Model-agnostic** — OpenAI, Anthropic, Gemini, Groq, Ollama, OpenRouter,
-  or any OpenAI-compatible endpoint.
+- **Model-agnostic** — OpenAI, Anthropic, Gemini, Z.AI, Groq, Ollama,
+  OpenRouter, or any OpenAI-compatible endpoint.
 - **Sandboxed by default** — every turn runs in an isolated Docker sandbox.
   Point it at real work without flinching.
 - **Headless & scriptable** — drive it from CI or another agent with
@@ -300,12 +300,17 @@ Supported providers:
 | `anthropic` | `ANTHROPIC_API_KEY` |
 | `gemini` | `GEMINI_API_KEY` |
 | `xai` | `XAI_API_KEY` |
+| `zai` | `ZAI_API_KEY` |
 | `deepseek` | `DEEPSEEK_API_KEY` |
 | `mistral` | `MISTRAL_API_KEY` |
 | `groq` | `GROQ_API_KEY` |
 | `openrouter` | `OPENROUTER_API_KEY` |
 | `ollama` | local server, no key |
 | `custom-openai-compatible` | `CUSTOM_OPENAI_API_KEY` |
+
+Setup model menus are curated starting points, not exhaustive provider catalogs;
+providers that allow custom model IDs still accept any model supported by that
+provider.
 
 See [docs/config.md](docs/config.md) for credentials, non-interactive access, environment variable overrides, and the full config schema.
 

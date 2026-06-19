@@ -65,6 +65,7 @@ def test_registry_contains_initial_provider_set() -> None:
         OPENAI_CODEX,
         OPENROUTER,
         XAI,
+        ZAI,
         get_provider,
         model_choices,
         provider_registry,
@@ -76,6 +77,7 @@ def test_registry_contains_initial_provider_set() -> None:
         ANTHROPIC,
         GEMINI,
         XAI,
+        ZAI,
         DEEPSEEK,
         MISTRAL,
         GROQ,
@@ -121,6 +123,15 @@ def test_registry_contains_initial_provider_set() -> None:
     assert get_provider(ANTHROPIC).default_api_key_env == "ANTHROPIC_API_KEY"
     assert get_provider(GEMINI).default_api_key_env == "GEMINI_API_KEY"
     assert get_provider(XAI).default_api_key_env == "XAI_API_KEY"
+    assert model_choices(get_provider(ZAI)) == (
+        "glm-5.2",
+        "glm-5.1",
+        "glm-4.7",
+        "glm-4.6",
+        "glm-4.5",
+        "glm-4.5-flash",
+    )
+    assert get_provider(ZAI).default_api_key_env == "ZAI_API_KEY"
     assert get_provider(DEEPSEEK).default_api_key_env == "DEEPSEEK_API_KEY"
     assert get_provider(MISTRAL).default_api_key_env == "MISTRAL_API_KEY"
     assert get_provider(GROQ).default_api_key_env == "GROQ_API_KEY"
@@ -153,6 +164,8 @@ def test_resolve_lm_prefers_explicit_lm() -> None:
         ("anthropic", "claude-sonnet-4-6", "anthropic/claude-sonnet-4-6"),
         ("gemini", "gemini-3.5-flash", "gemini/gemini-3.5-flash"),
         ("xai", "grok-4.3", "xai/grok-4.3"),
+        ("zai", "glm-5.2", "zai/glm-5.2"),
+        ("zai", "zai/glm-4.5-flash", "zai/glm-4.5-flash"),
         ("deepseek", "deepseek-v4-pro", "deepseek/deepseek-v4-pro"),
         ("mistral", "devstral-2-latest", "mistral/devstral-2-latest"),
         ("groq", "openai/gpt-oss-120b", "groq/openai/gpt-oss-120b"),
@@ -194,6 +207,7 @@ def test_api_backed_providers_normalize_model_strings(
         ("anthropic", "ANTHROPIC_API_KEY"),
         ("gemini", "GEMINI_API_KEY"),
         ("xai", "XAI_API_KEY"),
+        ("zai", "ZAI_API_KEY"),
         ("deepseek", "DEEPSEEK_API_KEY"),
         ("mistral", "MISTRAL_API_KEY"),
         ("groq", "GROQ_API_KEY"),

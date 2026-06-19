@@ -16,6 +16,7 @@ OPENAI_API = "openai-api"
 ANTHROPIC = "anthropic"
 GEMINI = "gemini"
 XAI = "xai"
+ZAI = "zai"
 DEEPSEEK = "deepseek"
 MISTRAL = "mistral"
 GROQ = "groq"
@@ -456,6 +457,23 @@ _PROVIDERS: dict[str, ProviderDefinition] = {
         model_options=("grok-code-fast-1", "grok-4-1-fast-reasoning"),
         default_api_key_env="XAI_API_KEY",
         model_prefix="xai",
+    ),
+    ZAI: ProviderDefinition(
+        id=ZAI,
+        display_name="Z.AI",
+        auth_type="api_key_env",
+        auth_source="env",
+        default_model="glm-5.2",
+        behavior=_API_KEY_STRING_LM,
+        model_options=(
+            "glm-5.1",
+            "glm-4.7",
+            "glm-4.6",
+            "glm-4.5",
+            "glm-4.5-flash",
+        ),
+        default_api_key_env="ZAI_API_KEY",
+        model_prefix="zai",
     ),
     DEEPSEEK: ProviderDefinition(
         id=DEEPSEEK,
