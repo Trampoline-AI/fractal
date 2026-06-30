@@ -6,6 +6,17 @@ from types import SimpleNamespace
 
 import pytest
 
+
+def install_fake_dspy_lm(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeLM:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+    import dspy
+
+    monkeypatch.setattr(dspy, "LM", FakeLM)
+
+
 GLOBAL_CONFIG = """
 schema_version = 1
 active_provider = "openai-api"
@@ -170,6 +181,7 @@ def test_resolve_runtime_lms_applies_project_overrides(
 ) -> None:
     from fractal import cli
 
+    install_fake_dspy_lm(monkeypatch)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "home"))
     monkeypatch.setenv("OPENAI_API_KEY", "sk-secret-value")
     write_global_config(tmp_path / "home")
@@ -185,7 +197,10 @@ def test_resolve_runtime_lms_applies_project_overrides(
     )
 
     assert lm_config is not None
-    assert lm_config.lm == "openai/gpt-5.4-mini"
+    assert lm_config.lm.kwargs == {
+        "model": "openai/gpt-5.4-mini",
+        "api_key": "sk-secret-value",
+    }
 
 
 def test_config_show_reports_layer_sources(

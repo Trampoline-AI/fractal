@@ -14,7 +14,6 @@ from predict_rlm.skills import docx, pdf, spreadsheet
 from predict_rlm.workspace import DirectWorkspaceMount
 
 from ..events import build_predict_runtime_hooks
-from ..lm_types import RuntimeLM
 from ..session import SessionHistoryTurn
 from .schema import FractalIterationEvent, FractalResult
 from .signature import build_edit_workspace_signature
@@ -49,8 +48,8 @@ class FractalAgent(dspy.Module):
 
     def __init__(
         self,
-        lm: RuntimeLM | None = None,
-        sub_lm: RuntimeLM | None = None,
+        lm: dspy.LM | None = None,
+        sub_lm: dspy.LM | None = None,
         max_iterations: int = 30,
         verbose: bool = True,
         debug: bool = False,

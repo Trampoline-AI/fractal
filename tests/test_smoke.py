@@ -95,6 +95,45 @@ def test_cli_parser_accepts_verbose() -> None:
     assert args.verbose is True
 
 
+def test_runtime_model_label_uses_dspy_lm_model_for_explicit_lm() -> None:
+    import dspy
+
+    from fractal.runtime import FractalRuntime
+
+    lm = dspy.LM(model="openai/gpt-test")
+    runtime = FractalRuntime(
+        workspace_path=Path.cwd(),
+        session=object(),  # type: ignore[arg-type]
+        agent=object(),  # type: ignore[arg-type]
+        lm=lm,
+        sub_lm=lm,
+    )
+
+    assert runtime.model_label == "openai/gpt-test"
+    assert "dspy.clients" not in runtime.model_label
+
+
+def test_runtime_sub_model_label_uses_dspy_lm_model_for_explicit_sub_lm() -> None:
+    import dspy
+
+    from fractal.runtime import FractalRuntime
+
+    lm = dspy.LM(model="openai/gpt-main")
+    sub_lm = dspy.LM(model="openai/gpt-sub")
+    runtime = FractalRuntime(
+        workspace_path=Path.cwd(),
+        session=object(),  # type: ignore[arg-type]
+        agent=object(),  # type: ignore[arg-type]
+        lm=lm,
+        sub_lm=sub_lm,
+        sub_lm_follows_main=False,
+    )
+
+    assert runtime.model_label == "openai/gpt-main"
+    assert runtime.sub_model_label == "openai/gpt-sub"
+    assert "dspy.clients" not in runtime.sub_model_label
+
+
 def test_cli_main_dispatches_non_interactive_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
     from fractal import cli
 

@@ -9,7 +9,7 @@ from types import MappingProxyType
 from typing import Literal, Protocol
 from urllib.parse import urlparse
 
-from .lm_types import RuntimeLM
+import dspy
 
 OPENAI_CODEX = "openai-codex"
 OPENAI_API = "openai-api"
@@ -86,7 +86,7 @@ class ProviderBehavior(Protocol):
         definition: "ProviderDefinition",
         *,
         env: Mapping[str, str] | None,
-    ) -> RuntimeLM: ...
+    ) -> dspy.LM: ...
 
 
 @dataclass(frozen=True)
@@ -131,17 +131,15 @@ class ProviderDefinition:
         selection: ProviderSelection,
         *,
         env: Mapping[str, str] | None = None,
-    ) -> RuntimeLM:
+    ) -> dspy.LM:
         return self.behavior.build_lm(selection, self, env=env)
 
 
 @dataclass(frozen=True)
-class ApiKeyStringLMRuntime:
+class ApiKeyLMRuntime:
     model: str
-    # None means litellm resolves the key from the env var at call time; a
-    # value means the key came from Fractal's credential store. repr is
-    # suppressed so the secret never lands in logs or tracebacks.
-    api_key: str | None = field(default=None, repr=False)
+    # repr is suppressed so stored or env-loaded secrets never land in logs or tracebacks.
+    api_key: str = field(repr=False)
 
 
 @dataclass(frozen=True)
@@ -163,7 +161,7 @@ class OllamaRuntime:
     base_url: str
 
 
-class ApiKeyStringLMBehavior:
+class ApiKeyLMBehavior:
     def validate_shape(
         self,
         selection: ProviderSelection,
@@ -189,16 +187,14 @@ class ApiKeyStringLMBehavior:
         definition: ProviderDefinition,
         *,
         env: Mapping[str, str] | None,
-    ) -> RuntimeLM:
+    ) -> dspy.LM:
         runtime = self._runtime(selection, definition, env=env)
-        if runtime.api_key is None:
-            return runtime.model
 
         try:
             import dspy
         except ImportError as exc:
             raise ProviderConfigError(
-                f"provider {definition.id!r} requires DSPy for stored API keys"
+                f"provider {definition.id!r} requires DSPy"
             ) from exc
 
         return dspy.LM(model=runtime.model, api_key=runtime.api_key)
@@ -209,14 +205,15 @@ class ApiKeyStringLMBehavior:
         definition: ProviderDefinition,
         *,
         env: Mapping[str, str] | None,
-    ) -> ApiKeyStringLMRuntime:
+    ) -> ApiKeyLMRuntime:
         self.validate_shape(selection, definition)
-        api_key: str | None = None
         if selection.auth_source == "stored":
             api_key = _require_stored_api_key(selection, definition)
         else:
-            _require_api_key_env(selection, definition, env=env)
-        return ApiKeyStringLMRuntime(
+            env_name = _require_api_key_env(selection, definition, env=env)
+            values = os.environ if env is None else env
+            api_key = values[env_name]
+        return ApiKeyLMRuntime(
             model=_normalize_model(_selection_model(selection, definition), definition),
             api_key=api_key,
         )
@@ -246,7 +243,7 @@ class CodexCliLMBehavior:
         definition: ProviderDefinition,
         *,
         env: Mapping[str, str] | None,
-    ) -> RuntimeLM:
+    ) -> dspy.LM:
         runtime = self._runtime(selection, definition)
         try:
             from dspy_codex_lm import CodexLM
@@ -297,7 +294,7 @@ class CustomOpenAICompatibleBehavior:
         definition: ProviderDefinition,
         *,
         env: Mapping[str, str] | None,
-    ) -> RuntimeLM:
+    ) -> dspy.LM:
         runtime = self._runtime(selection, definition, env=env)
 
         try:
@@ -362,7 +359,7 @@ class OllamaLMBehavior:
         definition: ProviderDefinition,
         *,
         env: Mapping[str, str] | None,
-    ) -> RuntimeLM:
+    ) -> dspy.LM:
         runtime = self._runtime(selection, definition)
 
         try:
@@ -390,7 +387,7 @@ class OllamaLMBehavior:
         )
 
 
-_API_KEY_STRING_LM = ApiKeyStringLMBehavior()
+_API_KEY_LM = ApiKeyLMBehavior()
 _CODEX_CLI_LM = CodexCliLMBehavior()
 _CUSTOM_OPENAI_COMPATIBLE_LM = CustomOpenAICompatibleBehavior()
 _OLLAMA_LM = OllamaLMBehavior()
@@ -416,7 +413,7 @@ _PROVIDERS: dict[str, ProviderDefinition] = {
         auth_type="api_key_env",
         auth_source="env",
         default_model="gpt-5.5",
-        behavior=_API_KEY_STRING_LM,
+        behavior=_API_KEY_LM,
         model_options=("gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano"),
         default_api_key_env="OPENAI_API_KEY",
         model_prefix="openai",
@@ -427,7 +424,7 @@ _PROVIDERS: dict[str, ProviderDefinition] = {
         auth_type="api_key_env",
         auth_source="env",
         default_model="claude-fable-5",
-        behavior=_API_KEY_STRING_LM,
+        behavior=_API_KEY_LM,
         model_options=(
             "claude-opus-4-8",
             "claude-sonnet-4-6",
@@ -442,7 +439,7 @@ _PROVIDERS: dict[str, ProviderDefinition] = {
         auth_type="api_key_env",
         auth_source="env",
         default_model="gemini-3.5-flash",
-        behavior=_API_KEY_STRING_LM,
+        behavior=_API_KEY_LM,
         model_options=("gemini-3.1-pro-preview", "gemini-3.1-flash-lite"),
         default_api_key_env="GEMINI_API_KEY",
         model_prefix="gemini",
@@ -453,7 +450,7 @@ _PROVIDERS: dict[str, ProviderDefinition] = {
         auth_type="api_key_env",
         auth_source="env",
         default_model="grok-4.3",
-        behavior=_API_KEY_STRING_LM,
+        behavior=_API_KEY_LM,
         model_options=("grok-code-fast-1", "grok-4-1-fast-reasoning"),
         default_api_key_env="XAI_API_KEY",
         model_prefix="xai",
@@ -464,7 +461,7 @@ _PROVIDERS: dict[str, ProviderDefinition] = {
         auth_type="api_key_env",
         auth_source="env",
         default_model="glm-5.2",
-        behavior=_API_KEY_STRING_LM,
+        behavior=_API_KEY_LM,
         model_options=(
             "glm-5.1",
             "glm-4.7",
@@ -481,7 +478,7 @@ _PROVIDERS: dict[str, ProviderDefinition] = {
         auth_type="api_key_env",
         auth_source="env",
         default_model="deepseek-v4-pro",
-        behavior=_API_KEY_STRING_LM,
+        behavior=_API_KEY_LM,
         model_options=("deepseek-v4-flash",),
         default_api_key_env="DEEPSEEK_API_KEY",
         model_prefix="deepseek",
@@ -492,7 +489,7 @@ _PROVIDERS: dict[str, ProviderDefinition] = {
         auth_type="api_key_env",
         auth_source="env",
         default_model="devstral-2-latest",
-        behavior=_API_KEY_STRING_LM,
+        behavior=_API_KEY_LM,
         model_options=(
             "mistral-large-latest",
             "mistral-medium-latest",
@@ -507,7 +504,7 @@ _PROVIDERS: dict[str, ProviderDefinition] = {
         auth_type="api_key_env",
         auth_source="env",
         default_model="openai/gpt-oss-120b",
-        behavior=_API_KEY_STRING_LM,
+        behavior=_API_KEY_LM,
         model_options=(
             "moonshotai/kimi-k2-instruct-0905",
             "qwen/qwen3-32b",
@@ -522,7 +519,7 @@ _PROVIDERS: dict[str, ProviderDefinition] = {
         auth_type="api_key_env",
         auth_source="env",
         default_model="openai/gpt-5.5",
-        behavior=_API_KEY_STRING_LM,
+        behavior=_API_KEY_LM,
         model_options=(
             "openai/gpt-5.4",
             "openai/gpt-5.4-mini",
@@ -597,13 +594,15 @@ def get_provider(provider_id: str) -> ProviderDefinition:
 
 
 def resolve_lm(
-    explicit_lm: RuntimeLM | None,
+    explicit_lm: dspy.LM | str | None,
     selection: ProviderSelection | None,
     *,
     env: Mapping[str, str] | None = None,
-) -> RuntimeLM | None:
+) -> dspy.LM | None:
     if explicit_lm is not None:
-        return explicit_lm
+        if isinstance(explicit_lm, dspy.LM):
+            return explicit_lm
+        return dspy.LM(model=explicit_lm)
     if selection is None:
         return None
     return build_lm(selection, env=env)
@@ -613,7 +612,7 @@ def build_lm(
     selection: ProviderSelection,
     *,
     env: Mapping[str, str] | None = None,
-) -> RuntimeLM:
+) -> dspy.LM:
     return get_provider(selection.provider).build_lm(selection, env=env)
 
 

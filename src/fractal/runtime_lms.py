@@ -4,15 +4,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Protocol, TextIO
 
+import dspy
+
 from .config import DefaultsConfig, FractalConfig
-from .lm_types import RuntimeLM
 from .providers import ProviderSelection
 
 
 @dataclass(frozen=True)
 class RuntimeLMConfig:
-    lm: RuntimeLM
-    sub_lm: RuntimeLM | None
+    lm: dspy.LM
+    sub_lm: dspy.LM
     provider_selection: ProviderSelection | None = None
     sub_lm_follows_main: bool = True
     defaults: DefaultsConfig | None = None
@@ -20,9 +21,17 @@ class RuntimeLMConfig:
 
 
 class RuntimeLMArgs(Protocol):
-    lm: RuntimeLM | None
-    sub_lm: RuntimeLM | None
+    lm: dspy.LM | str | None
+    sub_lm: dspy.LM | str | None
     workspace: Path | None
+
+
+
+def coerce_lm(lm: dspy.LM | str) -> dspy.LM:
+    """Normalize Fractal's accepted LM inputs into a concrete DSPy LM."""
+    if isinstance(lm, dspy.LM):
+        return lm
+    return dspy.LM(model=lm)
 
 
 def resolve_runtime_lms(
@@ -38,9 +47,11 @@ def resolve_runtime_lms(
     from .providers import ProviderError, build_lm
 
     if args.lm is not None:
+        lm = coerce_lm(args.lm)
+        sub_lm = lm if args.sub_lm is None else coerce_lm(args.sub_lm)
         return RuntimeLMConfig(
-            lm=args.lm,
-            sub_lm=args.sub_lm,
+            lm=lm,
+            sub_lm=sub_lm,
             provider_selection=None,
             sub_lm_follows_main=args.sub_lm is None,
         )
@@ -85,7 +96,7 @@ def resolve_runtime_lms(
             file=stderr,
         )
         return None
-    sub_lm = args.sub_lm
+    sub_lm = None if args.sub_lm is None else coerce_lm(args.sub_lm)
     sub_lm_follows_main = args.sub_lm is None
     sub_model = result.config.active_sub_model
     if sub_lm is None:

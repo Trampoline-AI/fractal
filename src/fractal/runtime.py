@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Protocol
 
+import dspy
 from predict_rlm import RunTrace
 from predict_rlm.trace import extract_trace_from_exc
 
@@ -13,7 +14,6 @@ from .agent.schema import FractalIterationEvent, FractalResult
 from .agent.service import FractalAgent, create_sbx_interpreter
 from .errors import user_facing_error
 from .events import FractalRuntimeEvent, RuntimeEventTracker
-from .lm_types import RuntimeLM
 from .providers import ProviderSelection
 from .session import (
     INTERRUPTED_ERROR,
@@ -42,6 +42,17 @@ class FractalAgentLike(Protocol):
     def prewarm(self) -> None: ...
 
 
+def _lm_model_label(lm: object | None) -> str | None:
+    if lm is None:
+        return None
+    if isinstance(lm, str):
+        return lm
+    model = getattr(lm, "model", None)
+    if isinstance(model, str) and model:
+        return model
+    return str(lm)
+
+
 class FractalRuntime:
     """Coordinates non-UI Fractal turn execution."""
 
@@ -54,8 +65,8 @@ class FractalRuntime:
         agent: FractalAgentLike,
         provider_selection: ProviderSelection | None = None,
         sub_lm_follows_main: bool = True,
-        lm: str | None = None,
-        sub_lm: str | None = None,
+        lm: dspy.LM | None = None,
+        sub_lm: dspy.LM | None = None,
         sub_model: str | None = None,
     ) -> None:
         self.workspace_path = Path(workspace_path).resolve()
@@ -74,8 +85,8 @@ class FractalRuntime:
         *,
         workspace_path: str | Path,
         included_paths: list[str | Path] | None = None,
-        lm: RuntimeLM | None,
-        sub_lm: RuntimeLM | None,
+        lm: dspy.LM,
+        sub_lm: dspy.LM,
         max_iterations: int,
         verbose: bool,
         debug: bool,
@@ -131,8 +142,10 @@ class FractalRuntime:
     @property
     def model_label(self) -> str:
         if self.provider_selection is None:
-            lm = getattr(self.agent, "lm", None)
-            return str(lm) if lm is not None else "unconfigured"
+            lm = self.lm
+            if lm is None:
+                lm = getattr(self.agent, "lm", None)
+            return _lm_model_label(lm) or "unconfigured"
         return self.provider_selection.model or "default"
 
     @property
@@ -144,7 +157,7 @@ class FractalRuntime:
         sub_lm = self.sub_lm
         if sub_lm is None:
             sub_lm = getattr(self.agent, "sub_lm", None)
-        return str(sub_lm) if sub_lm is not None else self.model_label
+        return _lm_model_label(sub_lm) or self.model_label
 
     def apply_provider_selection(
         self,

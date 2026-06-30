@@ -148,12 +148,26 @@ def test_unknown_provider_raises_clear_error() -> None:
         get_provider("missing")
 
 
-def test_resolve_lm_prefers_explicit_lm() -> None:
+def test_resolve_lm_coerces_explicit_model_strings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from fractal.providers import OPENAI_API, ProviderSelection, resolve_lm
 
-    explicit = "explicit-lm"
+    created: dict[str, object] = {}
 
-    assert resolve_lm(explicit, ProviderSelection(OPENAI_API, model="gpt-5.5")) is explicit
+    class FakeLM:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+            created.update(kwargs)
+
+    import dspy
+
+    monkeypatch.setattr(dspy, "LM", FakeLM)
+
+    lm = resolve_lm("explicit-lm", ProviderSelection(OPENAI_API, model="gpt-5.5"))
+
+    assert isinstance(lm, FakeLM)
+    assert created == {"model": "explicit-lm"}
 
 
 @pytest.mark.parametrize(
@@ -181,23 +195,34 @@ def test_resolve_lm_prefers_explicit_lm() -> None:
         ),
     ],
 )
-def test_api_backed_providers_normalize_model_strings(
+def test_api_backed_providers_build_lms_with_normalized_models(
+    monkeypatch: pytest.MonkeyPatch,
     provider: str,
     model: str,
     expected: str,
 ) -> None:
     from fractal.providers import ProviderSelection, build_lm, get_provider
 
+    created: dict[str, object] = {}
+
+    def fake_lm(**kwargs: object) -> object:
+        created.update(kwargs)
+        return SimpleNamespace(kind="lm")
+
+    import dspy
+
+    monkeypatch.setattr(dspy, "LM", fake_lm)
+
     env_name = get_provider(provider).default_api_key_env
     assert env_name is not None
 
-    assert (
-        build_lm(
-            ProviderSelection(provider, model=model),
-            env={env_name: "secret-value"},
-        )
-        == expected
+    lm = build_lm(
+        ProviderSelection(provider, model=model),
+        env={env_name: "secret-value"},
     )
+
+    assert lm.kind == "lm"
+    assert created == {"model": expected, "api_key": "secret-value"}
 
 
 @pytest.mark.parametrize(

@@ -9,6 +9,21 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 
+
+def install_fake_dspy_lm(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    calls: dict[str, object] = {}
+
+    class FakeLM:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+            calls.setdefault("instances", []).append(self)
+
+    import dspy
+
+    monkeypatch.setattr(dspy, "LM", FakeLM)
+    return calls
+
+
 def write_api_config(config_home: Path, *, api_key_env: str = "OPENAI_API_KEY") -> Path:
     path = config_home / "fractal" / "config.toml"
     path.parent.mkdir(parents=True)
@@ -349,6 +364,7 @@ def test_resolve_runtime_lms_uses_global_config(
 ) -> None:
     from fractal import cli
 
+    install_fake_dspy_lm(monkeypatch)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     monkeypatch.setenv("OPENAI_API_KEY", "sk-secret-value")
     write_api_config(tmp_path)
@@ -363,8 +379,11 @@ def test_resolve_runtime_lms_uses_global_config(
     )
 
     assert lm_config is not None
-    assert lm_config.lm == "openai/gpt-5.5"
-    assert lm_config.sub_lm == "openai/gpt-5.5"
+    assert lm_config.lm.kwargs == {
+        "model": "openai/gpt-5.5",
+        "api_key": "sk-secret-value",
+    }
+    assert lm_config.sub_lm is lm_config.lm
     assert lm_config.provider_selection is not None
     assert lm_config.provider_selection.provider == "openai-api"
     assert lm_config.provider_selection.model == "gpt-5.5"
@@ -377,6 +396,7 @@ def test_resolve_runtime_lms_auto_setup_on_missing_config(
 ) -> None:
     from fractal import cli
 
+    install_fake_dspy_lm(monkeypatch)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     monkeypatch.setenv("ANTHROPIC_API_KEY", "secret-value")
     args = SimpleNamespace(lm=None, sub_lm=None)
@@ -393,7 +413,10 @@ def test_resolve_runtime_lms_auto_setup_on_missing_config(
     )
 
     assert lm_config is not None
-    assert lm_config.lm == "anthropic/claude-sonnet-4-6"
+    assert lm_config.lm.kwargs == {
+        "model": "anthropic/claude-sonnet-4-6",
+        "api_key": "secret-value",
+    }
     assert "starting setup" in stderr.getvalue()
     assert setup_start_calls == [True]
     assert (tmp_path / "fractal" / "config.toml").exists()
@@ -427,6 +450,7 @@ def test_resolve_runtime_lms_builds_configured_sub_model(
 ) -> None:
     from fractal import cli
 
+    install_fake_dspy_lm(monkeypatch)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     monkeypatch.setenv("OPENAI_API_KEY", "sk-secret-value")
     path = tmp_path / "fractal" / "config.toml"
@@ -455,9 +479,16 @@ api_key_env = "OPENAI_API_KEY"
     )
 
     assert lm_config is not None
-    assert lm_config.lm == "openai/gpt-5.5"
-    assert lm_config.sub_lm == "openai/gpt-5.4-mini"
+    assert lm_config.lm.kwargs == {
+        "model": "openai/gpt-5.5",
+        "api_key": "sk-secret-value",
+    }
+    assert lm_config.sub_lm.kwargs == {
+        "model": "openai/gpt-5.4-mini",
+        "api_key": "sk-secret-value",
+    }
     assert lm_config.sub_lm_follows_main is False
+    assert lm_config.sub_model == "gpt-5.4-mini"
 
 
 def test_config_defaults_apply_when_cli_flags_are_omitted(
