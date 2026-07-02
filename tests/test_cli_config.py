@@ -9,7 +9,6 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 
-
 def install_fake_dspy_lm(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
     calls: dict[str, object] = {}
 

@@ -23,8 +23,7 @@ def _resolve_lms() -> tuple[object, object]:
     test uses the user's configured provider instead of relying on a global
     ``dspy.configure``. Skips if no usable config is present.
     """
-    from fractal.config import FractalConfigError, load_layered_config
-    from fractal.config import effective_lm_num_retries
+    from fractal.config import FractalConfigError, effective_lm_num_retries, load_layered_config
     from fractal.providers import ProviderError, build_lm
     from fractal.runtime_lms import selection_from_config, sub_selection_from_config
 
