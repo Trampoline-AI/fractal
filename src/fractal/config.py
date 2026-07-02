@@ -21,6 +21,8 @@ ENV_SUB_PROVIDER = "FRACTAL_SUB_PROVIDER"
 ENV_SUB_MODEL = "FRACTAL_SUB_MODEL"
 ENV_MAX_ITERATIONS = "FRACTAL_MAX_ITERATIONS"
 ENV_VERBOSE = "FRACTAL_VERBOSE"
+ENV_LM_NUM_RETRIES = "FRACTAL_LM_NUM_RETRIES"
+DEFAULT_LM_NUM_RETRIES = 3
 REDACTED = "<redacted>"
 _ENV_VAR_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _PROVIDER_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
@@ -86,6 +88,7 @@ class DefaultsConfig(BaseModel):
 
     max_iterations: int | None = Field(default=None, ge=1)
     verbose: bool | None = None
+    num_retries: int | None = Field(default=None, ge=0)
 
 
 class FractalConfig(BaseModel):
@@ -323,6 +326,15 @@ def load_layered_config(
             verbose, name=ENV_VERBOSE, path=error_path
         )
         env_overrides.append(ENV_VERBOSE)
+    num_retries = environment.get(ENV_LM_NUM_RETRIES)
+    if num_retries:
+        try:
+            data.setdefault("defaults", {})["num_retries"] = int(num_retries)
+        except ValueError as exc:
+            raise FractalConfigSchemaError(
+                error_path, f"{ENV_LM_NUM_RETRIES} must be an integer"
+            ) from exc
+        env_overrides.append(ENV_LM_NUM_RETRIES)
 
     try:
         merged = FractalConfig.model_validate(data)
@@ -350,6 +362,12 @@ def _parse_env_bool(value: str, *, name: str, path: Path) -> bool:
     if normalized in {"0", "false", "no", "off"}:
         return False
     raise FractalConfigSchemaError(path, f"{name} must be a boolean (true/false)")
+
+
+def effective_lm_num_retries(defaults: DefaultsConfig | None = None) -> int:
+    if defaults is not None and defaults.num_retries is not None:
+        return defaults.num_retries
+    return DEFAULT_LM_NUM_RETRIES
 
 
 def resolve_effective_config(
@@ -434,6 +452,11 @@ def render_effective_config(config: EffectiveFractalConfig) -> str:
         lines.append(f"defaults.max_iterations: {config.defaults.max_iterations}")
     if config.defaults.verbose is not None:
         lines.append(f"defaults.verbose: {config.defaults.verbose}")
+    retry_value = effective_lm_num_retries(config.defaults)
+    if config.defaults.num_retries is None:
+        lines.append(f"defaults.num_retries: {retry_value} (default)")
+    else:
+        lines.append(f"defaults.num_retries: {retry_value}")
     return "\n".join(lines)
 
 

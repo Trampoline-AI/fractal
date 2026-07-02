@@ -307,3 +307,37 @@ max_iterations = 0
 
     with pytest.raises(FractalConfigSchemaError, match="max_iterations"):
         load_config(path)
+
+
+
+def test_render_config_shows_effective_num_retries_default(tmp_path: Path) -> None:
+    from fractal.config import load_config, render_config
+
+    path = tmp_path / "config.toml"
+    path.write_text(valid_config_text(), encoding="utf-8")
+    result = load_config(path)
+    assert result.config is not None
+
+    rendered = render_config(result.config, path=path)
+
+    assert "defaults.num_retries: 3 (default)" in rendered
+
+
+def test_config_accepts_num_retries_default(tmp_path: Path) -> None:
+    from fractal.config import load_config
+
+    path = tmp_path / "config.toml"
+    path.write_text(
+        valid_config_text()
+        + """
+
+[defaults]
+num_retries = 5
+""",
+        encoding="utf-8",
+    )
+
+    result = load_config(path)
+
+    assert result.config is not None
+    assert result.config.defaults.num_retries == 5

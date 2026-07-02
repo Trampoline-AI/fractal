@@ -279,6 +279,7 @@ def run_tui(args: argparse.Namespace, notifier: Any | None = None) -> int:
             provider_selection=lm_config.provider_selection,
             sub_lm_follows_main=lm_config.sub_lm_follows_main,
             sub_model=lm_config.sub_model,
+            lm_num_retries=lm_config.lm_num_retries,
             reuse_sandbox=reuse_sandbox,
         )
         with console.status(status_text, spinner="dots"):
@@ -392,6 +393,7 @@ def run_non_interactive(
             provider_selection=lm_config.provider_selection,
             sub_lm_follows_main=lm_config.sub_lm_follows_main,
             sub_model=lm_config.sub_model,
+            lm_num_retries=lm_config.lm_num_retries,
             reuse_sandbox=reuse_sandbox,
         )
     except Exception as exc:

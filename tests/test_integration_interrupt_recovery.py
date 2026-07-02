@@ -24,6 +24,7 @@ def _resolve_lms() -> tuple[object, object]:
     ``dspy.configure``. Skips if no usable config is present.
     """
     from fractal.config import FractalConfigError, load_layered_config
+    from fractal.config import effective_lm_num_retries
     from fractal.providers import ProviderError, build_lm
     from fractal.runtime_lms import selection_from_config, sub_selection_from_config
 
@@ -37,9 +38,15 @@ def _resolve_lms() -> tuple[object, object]:
         )
 
     try:
+        num_retries = effective_lm_num_retries(result.config.defaults)
         lm = build_lm(selection_from_config(result.config, path=result.path))
+        lm.num_retries = num_retries
         sub_selection = sub_selection_from_config(result.config, path=result.path)
-        sub_lm = build_lm(sub_selection) if sub_selection is not None else lm
+        if sub_selection is None:
+            sub_lm = lm
+        else:
+            sub_lm = build_lm(sub_selection)
+            sub_lm.num_retries = num_retries
     except ProviderError as exc:
         pytest.skip(f"Fractal provider not ready for integration test: {exc}")
     return lm, sub_lm

@@ -68,6 +68,7 @@ class FractalRuntime:
         lm: dspy.LM | None = None,
         sub_lm: dspy.LM | None = None,
         sub_model: str | None = None,
+        lm_num_retries: int = 3,
     ) -> None:
         self.workspace_path = Path(workspace_path).resolve()
         self.included_paths = [Path(path).resolve() for path in included_paths or []]
@@ -78,6 +79,7 @@ class FractalRuntime:
         self.lm = lm
         self.sub_lm = sub_lm
         self.sub_model = sub_model
+        self.lm_num_retries = lm_num_retries
 
     @classmethod
     def create(
@@ -94,6 +96,7 @@ class FractalRuntime:
         provider_selection: ProviderSelection | None = None,
         sub_lm_follows_main: bool = True,
         sub_model: str | None = None,
+        lm_num_retries: int = 3,
         reuse_sandbox: bool = True,
     ) -> "FractalRuntime":
         workspace = Path(workspace_path).resolve()
@@ -104,6 +107,7 @@ class FractalRuntime:
             provider_selection=provider_selection,
             sub_lm_follows_main=sub_lm_follows_main,
             sub_model=sub_model,
+            lm_num_retries=lm_num_retries,
             agent=FractalAgent(
                 lm=lm,
                 sub_lm=sub_lm,
@@ -175,7 +179,9 @@ class FractalRuntime:
             sub_selection = replace(selection, model=sub_model)
         if sub_selection is not None:
             check_provider_readiness(sub_selection)
+        num_retries = self.lm_num_retries
         lm = build_lm(selection)
+        lm.num_retries = num_retries
         setattr(self.agent, "lm", lm)
         self.lm = lm
         if sub_selection is None:
@@ -185,6 +191,7 @@ class FractalRuntime:
             self.sub_model = None
         else:
             sub_lm = build_lm(sub_selection)
+            sub_lm.num_retries = num_retries
             setattr(self.agent, "sub_lm", sub_lm)
             self.sub_lm = sub_lm
             self.sub_lm_follows_main = False

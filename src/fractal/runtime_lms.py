@@ -6,7 +6,7 @@ from typing import Callable, Protocol, TextIO
 
 import dspy
 
-from .config import DefaultsConfig, FractalConfig
+from .config import DefaultsConfig, FractalConfig, effective_lm_num_retries
 from .providers import ProviderSelection
 
 
@@ -17,6 +17,7 @@ class RuntimeLMConfig:
     provider_selection: ProviderSelection | None = None
     sub_lm_follows_main: bool = True
     defaults: DefaultsConfig | None = None
+    lm_num_retries: int = 3
     sub_model: str | None = None
 
 
@@ -24,7 +25,6 @@ class RuntimeLMArgs(Protocol):
     lm: dspy.LM | str | None
     sub_lm: dspy.LM | str | None
     workspace: Path | None
-
 
 
 def coerce_lm(lm: dspy.LM | str) -> dspy.LM:
@@ -47,13 +47,17 @@ def resolve_runtime_lms(
     from .providers import ProviderError, build_lm
 
     if args.lm is not None:
+        num_retries = effective_lm_num_retries()
         lm = coerce_lm(args.lm)
+        lm.num_retries = num_retries
         sub_lm = lm if args.sub_lm is None else coerce_lm(args.sub_lm)
+        sub_lm.num_retries = num_retries
         return RuntimeLMConfig(
             lm=lm,
             sub_lm=sub_lm,
             provider_selection=None,
             sub_lm_follows_main=args.sub_lm is None,
+            lm_num_retries=num_retries,
         )
 
     workspace = getattr(args, "workspace", None)
@@ -85,9 +89,11 @@ def resolve_runtime_lms(
             print("fractal: setup completed but config could not be loaded", file=stderr)
             return None
 
+    num_retries = effective_lm_num_retries(result.config.defaults)
     selection = selection_from_config(result.config, path=result.path)
     try:
         lm = build_lm(selection)
+        lm.num_retries = num_retries
     except ProviderError as exc:
         print(f"fractal config: {exc}", file=stderr)
         print(
@@ -97,22 +103,22 @@ def resolve_runtime_lms(
         )
         return None
     sub_lm = None if args.sub_lm is None else coerce_lm(args.sub_lm)
+    if sub_lm is not None:
+        sub_lm.num_retries = num_retries
     sub_lm_follows_main = args.sub_lm is None
     sub_model = result.config.active_sub_model
     if sub_lm is None:
         try:
-            sub_selection = sub_selection_from_config(
-                result.config, path=result.path
-            )
+            sub_selection = sub_selection_from_config(result.config, path=result.path)
             if sub_selection is not None:
                 sub_lm = build_lm(sub_selection)
+                sub_lm.num_retries = num_retries
                 sub_model = sub_selection.model
                 sub_lm_follows_main = False
         except ProviderError as exc:
             print(f"fractal config: sub model: {exc}", file=stderr)
             print(
-                "Fix `active_sub_provider`/`active_sub_model` in the config "
-                "or remove them.",
+                "Fix `active_sub_provider`/`active_sub_model` in the config or remove them.",
                 file=stderr,
             )
             return None
@@ -124,6 +130,7 @@ def resolve_runtime_lms(
         provider_selection=selection,
         sub_lm_follows_main=sub_lm_follows_main,
         defaults=result.config.defaults,
+        lm_num_retries=num_retries,
         sub_model=sub_model,
     )
 

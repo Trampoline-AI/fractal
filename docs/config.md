@@ -115,7 +115,8 @@ API keys, OAuth tokens, or other secrets.
 Config is resolved in layers: the global file, then per-workspace overrides in
 `<workspace>/.fractal/config.toml` (same schema, every field optional), then
 `FRACTAL_PROVIDER` / `FRACTAL_MODEL` / `FRACTAL_SUB_PROVIDER` /
-`FRACTAL_SUB_MODEL` / `FRACTAL_MAX_ITERATIONS` / `FRACTAL_VERBOSE`
+`FRACTAL_SUB_MODEL` / `FRACTAL_MAX_ITERATIONS` / `FRACTAL_VERBOSE` /
+`FRACTAL_LM_NUM_RETRIES`
 environment variables, with CLI
 flags on top. A repo can pin its model without touching anyone's global
 config, and CI can override via env. `fractal config show` lists which layers
@@ -132,9 +133,10 @@ active_sub_model = "gpt-5.4-mini"
 # during setup too); defaults to the main provider
 active_sub_provider = "groq"
 
-[defaults]            # optional run defaults, overridden by CLI flags
+[defaults]            # optional run defaults, overridden by CLI flags/env
 max_iterations = 30   # --max-iterations
 verbose = false       # --verbose
+num_retries = 3       # dspy.LM(num_retries=...), defaults to 3 when omitted
 ```
 
 The config can hold several provider profiles at once. Setup merges into the
@@ -144,6 +146,8 @@ saved auth — so switching back to a configured provider is just two prompts
 (provider, model), and `fractal config set active_provider <id>` switches
 non-interactively. Switching providers clears `active_sub_model`; run
 defaults are preserved.
+
+`num_retries` is intentionally omitted by setup unless you configure it; `fractal config show` still displays the effective default.
 
 Setup walks main provider → main model → sub-model provider (defaulting to
 "same as main provider") → sub-model, then collects auth for each distinct
