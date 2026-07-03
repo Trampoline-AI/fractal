@@ -20,7 +20,7 @@ classifiers = [
 dependencies = [
     "pydantic>=2",
     "prompt-toolkit>=3.0",
-    "predict-rlm[sbx]>=0.7.0",
+    "predict-rlm[sbx]>=0.7.1",
     "rich>=13",
     "tomli-w>=1.2",
 ]
