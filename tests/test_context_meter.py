@@ -44,10 +44,23 @@ def test_build_next_context_messages_formats_initial_action_prompt(tmp_path: Pat
     assert "Always run `uv run pytest`." in prompt_text
     assert "old request" in prompt_text
     assert "old answer" in prompt_text
-    assert "Workspace directories" in prompt_text
-    assert "You have not interacted with the REPL environment yet." in prompt_text
-    assert "[[ ## iteration ## ]]\n1/12" in prompt_text
+    assert "Primary workspace:" in prompt_text
+    assert "Session history:" in prompt_text
+    assert "Iteration: 1/12" in prompt_text
     assert "current draft" not in prompt_text
+
+
+def test_estimate_next_context_tokens_adds_fixed_predict_rlm_allowance(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from fractal import context_meter
+
+    runtime = FakeRuntime(tmp_path)
+    monkeypatch.setattr(context_meter, "count_messages_tokens", lambda *_: 123)
+
+    assert context_meter.estimate_next_context_tokens(runtime) == (
+        context_meter.PREDICT_RLM_BASE_PROMPT_TOKEN_ALLOWANCE + 123
+    )
 
 
 def test_context_estimate_cache_key_changes_with_session(tmp_path: Path) -> None:

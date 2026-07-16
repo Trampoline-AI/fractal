@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from predict_rlm import RunTrace
-from predict_rlm.trace import IterationStep
+from predict_rlm import IterationStep, RunTrace
 
 
 @dataclass(slots=True)

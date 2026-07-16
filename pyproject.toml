@@ -25,6 +25,10 @@ dependencies = [
     "tomli-w>=1.2",
 ]
 
+[tool.uv.sources]
+# TODO(predict-rlm): Replace this temporary local source with the released runtime-adapter version.
+predict-rlm = { path = "../predict-rlm", editable = true }
+
 [project.urls]
 Homepage = "https://www.trampoline.ai/"
 Repository = "https://github.com/Trampoline-AI/fractal"

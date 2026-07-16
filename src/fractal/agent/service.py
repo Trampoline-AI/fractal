@@ -8,10 +8,17 @@ from typing import Protocol, cast
 
 import dspy
 from dspy.utils.callback import BaseCallback
-from predict_rlm import PredictRLM, RunTrace, Workspace, WorkspaceMode
-from predict_rlm.backends import ExecutionBackend, SbxBackend, SbxConfig
+from predict_rlm import (
+    ExecutionBackend,
+    HostDirectoryMount,
+    PredictRLM,
+    RunTrace,
+    SbxBackend,
+    SbxConfig,
+    Workspace,
+    WorkspaceMode,
+)
 from predict_rlm.skills import docx, pdf, spreadsheet
-from predict_rlm.workspace import DirectWorkspaceMount
 
 from ..events import build_predict_runtime_hooks
 from ..session import SessionHistoryTurn
@@ -128,6 +135,15 @@ class FractalAgent(dspy.Module):
         )
         return _prediction_to_result(result)
 
+    async def aclose(self) -> None:
+        if self.interpreter is None:
+            return
+        ashutdown = getattr(self.interpreter, "ashutdown", None)
+        if callable(ashutdown):
+            await ashutdown()
+            return
+        self.interpreter.shutdown()
+
     def close(self) -> None:
         if self.interpreter is not None:
             self.interpreter.shutdown()
@@ -190,10 +206,10 @@ def remove_sandbox_for(
 def build_direct_workspace_mounts(
     workspace_path: str | Path,
     included_paths: list[str | Path] | None = None,
-) -> list[DirectWorkspaceMount]:
+) -> list[HostDirectoryMount]:
     paths = [Path(workspace_path), *[Path(path) for path in included_paths or []]]
     return [
-        DirectWorkspaceMount(
+        HostDirectoryMount(
             host_path=str(path.resolve()),
             sandbox_path=str(path.resolve()),
         )

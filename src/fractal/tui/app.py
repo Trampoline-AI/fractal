@@ -7,8 +7,7 @@ import sys
 from pathlib import Path
 from typing import Protocol, TextIO
 
-from predict_rlm import RunTrace
-from predict_rlm.trace import IterationStep
+from predict_rlm import IterationStep, RunTrace
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.document import Document

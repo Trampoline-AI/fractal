@@ -546,6 +546,33 @@ def test_runtime_close_closes_agent(tmp_path: Path) -> None:
     assert closed == [True]
 
 
+def test_runtime_aclose_uses_agent_async_cleanup(tmp_path: Path) -> None:
+    from fractal.runtime import FractalRuntime
+    from fractal.session import FractalSession
+
+    events: list[str] = []
+
+    class FakeAgent:
+        async def aforward(self, **kwargs: object) -> object:
+            raise AssertionError("agent should not run")
+
+        def close(self) -> None:
+            events.append("close")
+
+        async def aclose(self) -> None:
+            events.append("aclose")
+
+    runtime = FractalRuntime(
+        workspace_path=tmp_path,
+        session=FractalSession(),
+        agent=FakeAgent(),
+    )
+
+    asyncio.run(runtime.aclose())
+
+    assert events == ["aclose"]
+
+
 def test_runtime_apply_provider_selection_updates_main_and_following_sub_lm(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import inspect
 import select
 import sys
 from pathlib import Path
@@ -15,6 +16,16 @@ MAX_STDIN_BYTES = 10 * 1024 * 1024
 STDIN_CONTEXT_GRACE_SECONDS = 1.0
 MAX_ITERATIONS_EXIT_CODE = 2
 DEFAULT_MAX_ITERATIONS = 30
+
+
+async def _aclose_runtime(runtime: Any) -> None:
+    aclose = getattr(runtime, "aclose", None)
+    if callable(aclose):
+        result = aclose()
+        if inspect.isawaitable(result):
+            await result
+        return
+    runtime.close()
 
 
 FRACTAL_BANNER = r"""
@@ -262,6 +273,7 @@ def run_tui(args: argparse.Namespace, notifier: Any | None = None) -> int:
     )
     runtime = None
     prewarm_complete = False
+    runtime_closed = False
     try:
         if args.fresh and reuse_sandbox:
             from .agent.service import remove_sandbox_for
@@ -285,15 +297,37 @@ def run_tui(args: argparse.Namespace, notifier: Any | None = None) -> int:
         with console.status(status_text, spinner="dots"):
             runtime.prewarm()
         prewarm_complete = True
-        asyncio.run(
-            TerminalFractalApp(
-                runtime,
-                console=console,
-                verbose_iterations=display_verbose,
-                banner=FRACTAL_BANNER,
-                update_notice=notifier.notice() if notifier is not None else None,
-            ).run()
+        async def run_app() -> None:
+            nonlocal runtime_closed
+            try:
+                await TerminalFractalApp(
+                    runtime,
+                    console=console,
+                    verbose_iterations=display_verbose,
+                    banner=FRACTAL_BANNER,
+                    update_notice=notifier.notice() if notifier is not None else None,
+                ).run()
+            finally:
+                try:
+                    if prewarm_complete:
+                        with console.status(
+                            "[dim]shutting down sandbox... press Ctrl-C again to force exit without cleaning up the sandbox[/dim]",
+                            spinner="dots",
+                        ):
+                            await _aclose_runtime(runtime)
+                    else:
+                        await _aclose_runtime(runtime)
+                finally:
+                    runtime_closed = True
+        asyncio.run(run_app())
+    except KeyboardInterrupt:
+        console.print(
+            "sandbox shutdown interrupted; a sandbox may still be running. "
+            "Run `sbx ls` and `sbx rm --force <name>` to clean it up.",
+            style="yellow",
         )
+        return 130
+
     except Exception as exc:
         console.print(
             f"fractal: {user_facing_error(exc)}",
@@ -303,16 +337,9 @@ def run_tui(args: argparse.Namespace, notifier: Any | None = None) -> int:
         )
         return 1
     finally:
-        if runtime is not None:
+        if runtime is not None and not runtime_closed:
             try:
-                if prewarm_complete:
-                    with console.status(
-                        "[dim]shutting down sandbox... press Ctrl-C again to force exit without cleaning up the sandbox[/dim]",
-                        spinner="dots",
-                    ):
-                        runtime.close()
-                else:
-                    runtime.close()
+                runtime.close()
             except KeyboardInterrupt:
                 console.print(
                     "sandbox shutdown interrupted; a sandbox may still be running. "
@@ -409,27 +436,15 @@ def run_non_interactive(
             print(f"fractal: {error}", file=stderr)
         return 1
 
-    try:
-        return _run_non_interactive_turn(
-            args,
-            runtime=runtime,
-            message=message,
-            display_verbose=display_verbose,
-            stdout=stdout,
-            stderr=stderr,
-            notifier=notifier,
-        )
-    finally:
-        try:
-            runtime.close()
-        except KeyboardInterrupt:
-            print(
-                "fractal: sandbox shutdown interrupted; a sandbox may still be "
-                "running. Run `sbx ls` and `sbx rm --force <name>` to clean it up.",
-                file=stderr,
-            )
-        except Exception as exc:
-            print(f"fractal: sandbox cleanup failed: {exc}", file=stderr)
+    return _run_non_interactive_turn(
+        args,
+        runtime=runtime,
+        message=message,
+        display_verbose=display_verbose,
+        stdout=stdout,
+        stderr=stderr,
+        notifier=notifier,
+    )
 
 
 def _run_non_interactive_turn(
@@ -471,18 +486,20 @@ def _run_non_interactive_turn(
         live_iteration_events_seen += 1
         trace_console.print(render_iteration_event_log(event, verbose=True))
 
-    try:
-        result = asyncio.run(
-            runtime.submit(
+    async def submit_and_close() -> Any:
+        try:
+            return await runtime.submit(
                 message,
                 on_runtime_event=print_runtime_event if not args.quiet else None,
                 on_iteration_event=(
-                    print_iteration_event
-                    if display_verbose and not args.quiet
-                    else None
+                    print_iteration_event if display_verbose and not args.quiet else None
                 ),
             )
-        )
+        finally:
+            await _aclose_runtime(runtime)
+
+    try:
+        result = asyncio.run(submit_and_close())
     except KeyboardInterrupt:
         if args.json:
             _emit_headless_json(

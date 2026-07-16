@@ -264,6 +264,39 @@ def test_run_non_interactive_prints_response_and_status(
     assert create_kwargs["verbose"] is False
 
 
+def test_run_non_interactive_closes_async_runtime_on_submit_loop(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from fractal import cli
+    from fractal.agent.schema import FractalResult
+    from fractal.runtime import FractalRuntime
+
+    loops: dict[str, object] = {}
+
+    class FakeRuntime:
+        workspace_path = tmp_path
+        session_id = "session-async-close"
+
+        async def submit(self, message: str, **kwargs: object) -> FractalResult:
+            del message, kwargs
+            loops["submit"] = asyncio.get_running_loop()
+            return FractalResult(response="done", changed_files=[])
+
+        async def aclose(self) -> None:
+            loops["close"] = asyncio.get_running_loop()
+
+        def close(self) -> None:
+            raise AssertionError("headless cleanup must run before asyncio.run closes its loop")
+
+    monkeypatch.setattr(FractalRuntime, "create", lambda **kwargs: FakeRuntime())
+    args = cli.build_parser().parse_args(
+        ["--workspace", str(tmp_path), "--lm", "test-lm", "-p", "task"]
+    )
+
+    assert cli.run_non_interactive(args, stdin=StringIO(), stdout=StringIO(), stderr=StringIO()) == 0
+    assert loops["close"] is loops["submit"]
+
+
 def test_run_non_interactive_closes_runtime_on_success_and_failure(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -1248,41 +1281,6 @@ def test_agent_prewarm_prewarms_interpreter() -> None:
     interpreter.prewarm.assert_called_once_with()
 
 
-def test_predict_rlm_sees_absolute_workspace_paths(tmp_path: Path) -> None:
-    if not workspace_available():
-        pytest.skip("predict_rlm.Workspace is not exported by the local branch yet")
-
-    from predict_rlm import PredictRLM
-
-    from fractal.agent.service import Workspace, WorkspaceMode
-    from fractal.agent.signature import build_edit_workspace_signature
-
-    included_path = tmp_path / "included"
-    included_path.mkdir()
-    workspace = Workspace(path=str(tmp_path), mode=WorkspaceMode.DIRECT)
-    included = Workspace(path=str(included_path), mode=WorkspaceMode.DIRECT)
-    rlm = PredictRLM(
-        build_edit_workspace_signature("test"),
-        sub_lm=MagicMock(),
-        max_iterations=1,
-        sandbox_backend="sbx",
-    )
-
-    plan, args = rlm._prepare_file_io({
-        "workspace": workspace,
-        "included_paths": [included],
-    })
-
-    assert plan is not None
-    assert args["workspace"] == str(tmp_path.resolve())
-    assert args["included_paths"] == [str(included_path.resolve())]
-    assert [
-        (mount.host_path, mount.sandbox_path)
-        for mount in plan["direct_workspace_mounts"]
-    ] == [
-        (str(tmp_path.resolve()), str(tmp_path.resolve())),
-        (str(included_path.resolve()), str(included_path.resolve())),
-    ]
 
 
 def test_prediction_to_result_rejects_string_changed_files() -> None:

@@ -6,14 +6,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from dspy.adapters.chat_adapter import ChatAdapter
-from dspy.primitives.repl_types import REPLHistory
-from predict_rlm import PredictRLM, Workspace, WorkspaceMode
-from predict_rlm.skills import docx, pdf, spreadsheet
-
 from fractal.agent.service import load_workspace_instructions
 from fractal.agent.signature import build_edit_workspace_signature
-from fractal.agent.skills import filesystem_coding_skill
+
+# Measured with ``litellm.token_counter(model="gpt-5.5", ...)`` against the
+# PredictRLM 0.7.2 base instruction template after substituting Fractal's fixed
+# input and output fields. Keep this static: the meter must not call
+# PredictRLM's private prompt-construction APIs.
+PREDICT_RLM_BASE_PROMPT_TOKEN_ALLOWANCE = 3364
 
 
 @dataclass(frozen=True)
@@ -55,7 +55,10 @@ def context_estimate_cache_key(runtime: object) -> ContextEstimateCacheKey:
 
 def estimate_next_context_tokens(runtime: object, *, user_message: str = "") -> int | None:
     messages = build_next_context_messages(runtime, user_message=user_message)
-    return count_messages_tokens(_model_label(runtime), messages)
+    tokens = count_messages_tokens(_model_label(runtime), messages)
+    if tokens is None:
+        return None
+    return PREDICT_RLM_BASE_PROMPT_TOKEN_ALLOWANCE + tokens
 
 
 def build_next_context_messages(
@@ -63,62 +66,36 @@ def build_next_context_messages(
     *,
     user_message: str = "",
 ) -> list[dict[str, Any]]:
-    """Format the initial action-LM messages for the next Fractal turn.
+    """Format only Fractal-owned context for the next-turn token estimate.
 
-    This mirrors the setup path in ``FractalAgent.aforward`` but stops before
-    calling the LM. The toolbar passes an empty ``user_message`` intentionally:
-    it shows the baseline context Fractal carries into the next turn, not the
-    draft currently being typed.
+    PredictRLM constructs its own action prompt and runtime input adapter
+    instructions during ``acall``. Its measured fixed instruction allowance is
+    added separately by ``estimate_next_context_tokens``.
     """
 
     workspace_path = Path(getattr(runtime, "workspace_path")).resolve()
-    workspace = Workspace(path=str(workspace_path), mode=WorkspaceMode.DIRECT)
-    if ".fractal" not in workspace.exclude:
-        workspace.exclude = [*workspace.exclude, ".fractal"]
-    included_workspaces = [
-        Workspace(path=str(Path(path).resolve()), mode=WorkspaceMode.DIRECT)
-        for path in getattr(runtime, "included_paths", []) or []
+    included_paths = [
+        str(Path(path).resolve()) for path in getattr(runtime, "included_paths", []) or []
     ]
-
     session = getattr(runtime, "session")
     signature = build_edit_workspace_signature(
         session.summary(),
         workspace_instructions=load_workspace_instructions(workspace_path),
     )
-    predictor = PredictRLM(
-        signature,
-        lm=None,
-        sub_lm=None,
-        skills=[filesystem_coding_skill, spreadsheet, pdf, docx],
-        max_iterations=_max_iterations(runtime),
-        verbose=False,
-        debug=False,
-        sandbox_backend="sbx",
-    )
-    input_args = {
-        "workspace": workspace,
-        "included_paths": included_workspaces or None,
-        "user_message": user_message,
-        "session_history": session.session_history_payload(),
-    }
-    file_plan, input_args = predictor._prepare_file_io(input_args)
-    if file_plan:
-        action_predictor, _ = predictor._build_signatures_with_files(
-            file_plan["instructions"]
+    turn_context = "\n".join(
+        (
+            "## Fractal-managed next-turn inputs",
+            f"Primary workspace: {workspace_path}",
+            f"Included workspaces: {included_paths or 'none'}",
+            f"User message: {user_message}",
+            f"Session history: {json.dumps(session.session_history_payload(), default=str)}",
+            f"Iteration: 1/{_max_iterations(runtime)}",
         )
-    else:
-        action_predictor = predictor.generate_action
-
-    variables = predictor._build_variables(**input_args)
-    return ChatAdapter().format(
-        action_predictor.signature,
-        [],
-        {
-            "variables_info": [variable.format() for variable in variables],
-            "repl_history": REPLHistory(),
-            "iteration": f"1/{predictor.max_iterations}",
-        },
     )
+    return [
+        {"role": "system", "content": signature.instructions},
+        {"role": "user", "content": turn_context},
+    ]
 
 
 def count_messages_tokens(

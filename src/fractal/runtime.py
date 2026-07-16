@@ -8,7 +8,6 @@ from typing import Protocol
 
 import dspy
 from predict_rlm import RunTrace
-from predict_rlm.trace import extract_trace_from_exc
 
 from .agent.schema import FractalIterationEvent, FractalResult
 from .agent.service import FractalAgent, create_sbx_interpreter
@@ -38,6 +37,8 @@ class FractalAgentLike(Protocol):
     ) -> FractalResult: ...
 
     def close(self) -> None: ...
+    async def aclose(self) -> None: ...
+
 
     def prewarm(self) -> None: ...
 
@@ -205,6 +206,15 @@ class FractalRuntime:
     def close(self) -> None:
         self.agent.close()
 
+    async def aclose(self) -> None:
+        aclose = getattr(self.agent, "aclose", None)
+        if callable(aclose):
+            result = aclose()
+            if inspect.isawaitable(result):
+                await result
+            return
+        self.agent.close()
+
     def prewarm(self) -> None:
         self.agent.prewarm()
 
@@ -344,7 +354,7 @@ class FractalRuntime:
 
 
 def _extract_run_trace(exc: BaseException) -> RunTrace | None:
-    trace = extract_trace_from_exc(exc)
+    trace = _trace_from_exception_chain(exc)
     if trace is None:
         return trace
     if isinstance(trace, RunTrace):
@@ -356,6 +366,18 @@ def _extract_run_trace(exc: BaseException) -> RunTrace | None:
             return _validate_run_trace(trace.model_dump(mode="python"))
         except TypeError:
             return None
+    return None
+
+
+def _trace_from_exception_chain(exc: BaseException) -> object | None:
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        trace = getattr(current, "trace", None)
+        if trace is not None:
+            return trace
+        current = current.__cause__ or current.__context__
     return None
 
 
